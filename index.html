@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Coaching Assistant</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #2c3e50, #4ca1af);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    h1 {
+      margin-bottom: 1rem;
+      font-size: 2rem;
+    }
+    .wave {
+      margin: 20px auto;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      animation: pulse 1s infinite ease-in-out;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(1.5); opacity: 0; }
+    }
+    .panel {
+      background-color: rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 1rem;
+      margin-top: 1.5rem;
+      width: 90%;
+      max-width: 700px;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+      transition: all 0.3s ease-in-out;
+    }
+    button {
+      background-color: #ffffff33;
+      border: none;
+      padding: 10px 20px;
+      color: white;
+      font-size: 1rem;
+      cursor: pointer;
+      border-radius: 5px;
+      margin: 10px 5px;
+    }
+    button:hover {
+      background-color: #ffffff55;
+    }
+    textarea {
+      width: 100%;
+      height: 160px;
+      font-size: 1rem;
+      margin-top: 10px;
+      border: none;
+      border-radius: 5px;
+      padding: 10px;
+    }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1>AI Coaching Assistant</h1>
+  <div class="panel">
+    <p><strong>Start your coaching session</strong> — just talk naturally.</p>
+    <button onclick="startRecording()">🎤 Start Talking</button>
+    <button onclick="stopRecording()">🛑 Stop</button>
+    <button onclick="sendToGemini()">✨ Generate Coaching Summary</button>
+    <div class="wave hidden" id="waveAnimation"></div>
+  </div>
+  <div class="panel" id="transcriptDisplay">Transcript will appear here...</div>
+  <div class="panel hidden" id="output"></div>
+
+  <script>
+    let finalTranscript = '';
+    let recognition;
+
+    function startRecording() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      finalTranscript = '';
+      document.getElementById("waveAnimation").classList.remove("hidden");
+
+      recognition.onresult = (event) => {
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript + '\n';
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+        document.getElementById('transcriptDisplay').innerText = finalTranscript + interimTranscript;
+      };
+
+      recognition.start();
+    }
+
+    function stopRecording() {
+      if (recognition) {
+        recognition.stop();
+        document.getElementById("waveAnimation").classList.add("hidden");
+      }
+    }
+
+    async function sendToGemini() {
+      const apiKey = "AIzaSyATUBQhGPaudK2eppEogZk6BUCdkP_jr0g";
+      const text = document.getElementById('transcriptDisplay').innerText;
+      document.getElementById("output").innerHTML = "🧠 Analyzing conversation...";
+      document.getElementById("output").classList.remove("hidden");
+
+      const prompt = `You are an AI for analyzing coaching conversations. Read the transcript and:
+1. Automatically identify who is the Manager and who is the Team Member based on context.
+2. Provide a summary of the discussion.
+3. List key action items.
+4. Create a next session agenda.
+5. Offer separate feedback for the Manager and the Team Member.
+
+Transcript:
+${text}`;
+
+      const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + apiKey, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+
+      const data = await res.json();
+      const result = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response.";
+      document.getElementById("output").innerHTML = \`
+        <h3>📝 AI Coaching Summary</h3>
+        <textarea readonly>\${result}</textarea>
+      \`;
+    }
+  </script>
+</body>
+</html>
